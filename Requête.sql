@@ -45,13 +45,18 @@ WHERE potion.nom_potion = 'Santé' ;
 
 
 -- Nom du ou des personnages qui ont pris le plus de casques dans la bataille 'Bataille du village gaulois'.
-SELECT personnage.nom_personnage , COUNT(prendre_casque.id_casque) FROM prendre_casque
-INNER JOIN personnage ON personnage.id_personnage = prendre_casque.id_personnage
-INNER JOIN bataille ON bataille.id_bataille = prendre_casque.id_bataille
-INNER JOIN casque ON casque.id_casque = prendre_casque.id_casque
-WHERE bataille.nom_bataille ='Bataille du village gaulois'
-GROUP BY  personnage.nom_personnage
-LIMIT 1;
+SELECT p.nom_personnage, SUM(pc.qte) AS nb_casques
+FROM personnage p, bataille b, prendre_casque pc
+WHERE p.id_personnage = pc.id_personnage
+AND pc.id_bataille = b.id_bataille
+AND b.nom_bataille = 'Bataille du village gaulois'
+GROUP BY p.id_personnage
+HAVING nb_casques >= ALL(
+SELECT SUM(pc.qte)
+ FROM prendre_casque pc, bataille b
+ WHERE b.id_bataille = pc.id_bataille
+ AND b.nom_bataille = 'Bataille du village gaulois'
+ GROUP BY pc.id_personnage)
 
 
 -- Nom des personnages et leur quantité de potion bue (en les classant du plus grand buveur au plus petit).
@@ -86,9 +91,13 @@ HAVING ingredient.nom_ingredient='Poisson frais';
 SELECT lieu.nom_lieu , COUNT(personnage.nom_personnage) FROM personnage
 INNER JOIN lieu ON lieu.id_lieu = personnage.id_lieu 
 GROUP BY lieu.nom_lieu 
-HAVING NOT lieu.nom_lieu = 'Village gaulois'
-ORDER BY COUNT(personnage.nom_personnage) DESC
-LIMIT 1;
+HAVING NOT lieu.nom_lieu = 'Village gaulois' AND COUNT(personnage.nom_personnage) = (
+  SELECT MAX(count)
+	  	FROM ( SELECT COUNT(personnage.nom_personnage) as count FROM personnage
+		INNER JOIN lieu ON lieu.id_lieu = personnage.id_lieu 
+		WHERE NOT lieu.nom_lieu = 'Village gaulois'
+		GROUP BY lieu.nom_lieu ) AS total ) 
+ORDER BY COUNT(personnage.nom_personnage) DESC;
 
 
 -- Nom des personnages qui n'ont jamais bu aucune potion.
